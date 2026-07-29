@@ -1,0 +1,187 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+  --background: #f8f8f7;
+  --foreground: #171717;
+  --muted: #6b6b6b;
+  --border: #dededa;
+  --surface: #ffffff;
+
+  --pattern-coherent-bg: #eaf2fb;
+  --pattern-coherent-accent: #5b8def;
+  --pattern-box-bg: #e7f4ef;
+  --pattern-box-accent: #3fa184;
+  --pattern-478-bg: #eeeaf7;
+  --pattern-478-accent: #7b6fc9;
+  --pattern-sigh-bg: #fbedea;
+  --pattern-sigh-accent: #e08976;
+  --pattern-wimhof-bg: #fbf1e1;
+  --pattern-wimhof-accent: #d99a3e;
+  --pattern-buteyko-bg: #eff3e9;
+  --pattern-buteyko-accent: #7fa35c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101010;
+    --foreground: #f3f3f2;
+    --muted: #a6a6a0;
+    --border: #2c2c2a;
+    --surface: #171716;
+
+    --pattern-coherent-bg: #0e1a2b;
+    --pattern-coherent-accent: #7ea8f5;
+    --pattern-box-bg: #0e211c;
+    --pattern-box-accent: #5fc2a2;
+    --pattern-478-bg: #171326;
+    --pattern-478-accent: #9c90e8;
+    --pattern-sigh-bg: #241512;
+    --pattern-sigh-accent: #f0a796;
+    --pattern-wimhof-bg: #251c0e;
+    --pattern-wimhof-accent: #e8b15e;
+    --pattern-buteyko-bg: #181f13;
+    --pattern-buteyko-accent: #9bc17c;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f8f8f7;
+  --foreground: #171717;
+  --muted: #6b6b6b;
+  --border: #dededa;
+  --surface: #ffffff;
+  --pattern-coherent-bg: #eaf2fb;
+  --pattern-coherent-accent: #5b8def;
+  --pattern-box-bg: #e7f4ef;
+  --pattern-box-accent: #3fa184;
+  --pattern-478-bg: #eeeaf7;
+  --pattern-478-accent: #7b6fc9;
+  --pattern-sigh-bg: #fbedea;
+  --pattern-sigh-accent: #e08976;
+  --pattern-wimhof-bg: #fbf1e1;
+  --pattern-wimhof-accent: #d99a3e;
+  --pattern-buteyko-bg: #eff3e9;
+  --pattern-buteyko-accent: #7fa35c;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #101010;
+  --foreground: #f3f3f2;
+  --muted: #a6a6a0;
+  --border: #2c2c2a;
+  --surface: #171716;
+  --pattern-coherent-bg: #0e1a2b;
+  --pattern-coherent-accent: #7ea8f5;
+  --pattern-box-bg: #0e211c;
+  --pattern-box-accent: #5fc2a2;
+  --pattern-478-bg: #171326;
+  --pattern-478-accent: #9c90e8;
+  --pattern-sigh-bg: #241512;
+  --pattern-sigh-accent: #f0a796;
+  --pattern-wimhof-bg: #251c0e;
+  --pattern-wimhof-accent: #e8b15e;
+  --pattern-buteyko-bg: #181f13;
+  --pattern-buteyko-accent: #9bc17c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icon-button {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.quiet-icon-button {
+  display: grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background) 62%, transparent);
+  color: var(--foreground);
+}
+
+.edge-nav {
+  position: fixed;
+  top: 50%;
+  z-index: 20;
+  display: grid;
+  height: 6rem;
+  width: 3.25rem;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 0;
+  background: color-mix(in srgb, var(--background) 58%, transparent);
+  color: var(--foreground);
+}
+
+.edge-nav-left {
+  left: 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.edge-nav-right {
+  right: 0;
+  border-radius: 8px 0 0 8px;
+}
+
+.primary-button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.95rem 1.25rem;
+  font-weight: 700;
+}
+
+.segmented {
+  display: grid;
+  min-height: 2.5rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  text-transform: capitalize;
+}
+
+.segmented-active {
+  background: var(--foreground);
+  color: var(--background);
+}

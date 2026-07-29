@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+dist
+build
+.env
+.env*.local
+*.log
+*.png
+*.webp
+*.jpg
+*.jpeg
+*.tsbuildinfo
+.agents
+skills-lock.json
+CLAUDE.md

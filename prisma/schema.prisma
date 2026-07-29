@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model AnonymousUser {
+  id        String    @id
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+}
+
+model Pattern {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String
+  category    String
+  colorHue    String
+  phases      Json
+  sessions    Session[]
+}
+
+model Session {
+  id              String   @id
+  anonymousUserId String
+  patternId       String
+  startedAt       DateTime
+  durationSec     Int
+  completed       Boolean  @default(false)
+  moodBefore      Int?
+  moodAfter       Int?
+
+  anonymousUser AnonymousUser @relation(fields: [anonymousUserId], references: [id])
+  pattern       Pattern       @relation(fields: [patternId], references: [id])
+
+  @@index([anonymousUserId, startedAt])
+}
