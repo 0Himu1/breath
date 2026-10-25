@@ -1,20 +1,26 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import gsap from 'gsap';
 import {
 	ArrowLeft,
 	ArrowRight,
 	BarChart3,
 	Check,
 	Moon,
+	Pause,
+	Play,
 	Settings2,
 	Sun,
 	Volume2,
 	Waves,
 	X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { patterns, type BreathPattern } from '@/lib/patterns';
+import { BreathVisual, PhaseRail } from '@/components/breath-visual';
+import { breathMoment } from '@/lib/breath-motion';
+import { SessionScreen } from '@/components/session-screen';
 import {
 	computeStreak,
 	defaultPreference,
@@ -30,18 +36,13 @@ import { retryUnsyncedSessions, syncSession } from '@/lib/sync';
 
 type View = 'home' | 'session' | 'end' | 'history';
 
-const circleScale = {
-	inhale: 1.34,
-	exhale: 0.78,
-	hold: 1.08,
-};
-
 export function BreathApp() {
 	const [view, setView] = useState<View>('home');
 	const [preference, setPreference] =
 		useState<LocalPreference>(defaultPreference);
 	const [sessions, setSessions] = useState<LocalSession[]>([]);
 	const [patternIndex, setPatternIndex] = useState(0);
+	const patternChosen = useRef(false);
 	const [activeSession, setActiveSession] = useState<LocalSession | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const selectedPattern = patterns[patternIndex];
@@ -57,7 +58,7 @@ export function BreathApp() {
 			const storedPreference = await getPreference();
 			if (!mounted) return;
 			setPreference(storedPreference);
-			setPatternIndex(
+			if (!patternChosen.current) setPatternIndex(
 				Math.max(
 					0,
 					patterns.findIndex(
@@ -84,6 +85,7 @@ export function BreathApp() {
 	};
 
 	const choosePattern = (direction: 1 | -1) => {
+		patternChosen.current = true;
 		setPatternIndex(
 			current => (current + direction + patterns.length) % patterns.length,
 		);
@@ -123,7 +125,7 @@ export function BreathApp() {
 	};
 
 	return (
-		<main className="min-h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+		<MotionConfig reducedMotion="user"><main className="min-h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
 			<AnimatePresence mode="wait">
 				{view === 'home' && (
 					<HomeScreen
@@ -135,7 +137,7 @@ export function BreathApp() {
 						settingsOpen={settingsOpen}
 						onPrev={() => choosePattern(-1)}
 						onNext={() => choosePattern(1)}
-						onSelectPattern={setPatternIndex}
+						onSelectPattern={index => { patternChosen.current = true; setPatternIndex(index); }}
 						onStart={startSession}
 						onHistory={() => setView('history')}
 						onOpenSettings={() => setSettingsOpen(true)}
@@ -174,7 +176,7 @@ export function BreathApp() {
 					/>
 				)}
 			</AnimatePresence>
-		</main>
+		</main></MotionConfig>
 	);
 }
 
@@ -209,9 +211,33 @@ function HomeScreen({
 }) {
 	const streak = computeStreak(sessions);
 	const patternVars = getPatternVars(pattern);
+	const [previewPaused, setPreviewPaused] = useState(false);
+	const [previewTime, setPreviewTime] = useState(0);
+	const [animatedIcon, setAnimatedIcon] = useState<string | null>(null);
+	const [starting, setStarting] = useState(false);
+	const startingRef = useRef(false);
+	const homeRoot = useRef<HTMLElement>(null);
+	const startMotion = useRef<gsap.Context | null>(null);
+	const previewMoment = breathMoment(pattern, previewTime);
+	useEffect(() => { setPreviewTime(0); }, [pattern.slug]);
+	useEffect(() => () => { startMotion.current?.revert(); }, []);
+	const beginSession = () => {
+		if (startingRef.current) return;
+		startingRef.current = true;
+		setStarting(true);
+		startMotion.current = gsap.context(() => {
+			const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			gsap.timeline({ onComplete: onStart })
+				.to('.breath-preview-art', { scale: reduced ? 1 : 1.07, opacity: 0, duration: reduced ? 0.12 : 0.28, ease: 'power2.inOut' })
+				.to('.breath-home-content h1, .breath-home-content p, .phase-rail, .preview-toggle, .pattern-picker', { opacity: 0, duration: 0.18 }, 0)
+				.to('.breath-start-control', { opacity: 0, duration: 0.16 }, 0.05);
+		}, homeRoot);
+	};
 
 	return (
 		<motion.section
+			ref={homeRoot}
+			inert={starting}
 			className="relative min-h-screen overflow-hidden bg-[var(--pattern-bg)]"
 			style={patternVars}
 			initial={{ opacity: 0 }}
@@ -261,7 +287,7 @@ function HomeScreen({
 				<ArrowRight size={28} />
 			</button>
 
-			<div className="absolute inset-0 grid place-items-center px-16 pb-48 pt-24 sm:px-24">
+			<div className="breath-home-content">
 				<motion.div
 					key={pattern.slug}
 					className="grid w-full max-w-[34rem] place-items-center text-center"
@@ -269,18 +295,18 @@ function HomeScreen({
 					animate={{ opacity: 1, x: 0 }}
 					exit={{ opacity: 0, x: -18 }}
 				>
-					<div className="grid h-32 w-32 place-items-center rounded-full bg-[color-mix(in_srgb,var(--pattern-accent)_18%,transparent)] sm:h-40 sm:w-40">
-						<div className="h-24 w-24 rounded-full bg-[var(--pattern-accent)] opacity-90 sm:h-28 sm:w-28" />
-					</div>
-					<p className="mt-8 text-sm uppercase tracking-[0.14em] text-[var(--muted)]">
-						{pattern.category}
-					</p>
-					<h1 className="mt-2 min-h-24 text-balance text-4xl font-semibold leading-tight sm:min-h-28 sm:text-5xl">
+					<div className="breath-preview-art"><BreathVisual key={pattern.slug} pattern={pattern} playing={!previewPaused && !settingsOpen && !starting} onTime={setPreviewTime} /></div>
+					<h1 className="mt-4 text-balance text-3xl font-semibold leading-tight sm:text-4xl">
 						{pattern.name}
 					</h1>
-					<p className="mt-3 min-h-12 max-w-96 text-balance text-base leading-6 text-[var(--muted)] sm:text-lg">
+					<p className="mt-3 max-w-96 text-balance text-base leading-6 text-[var(--muted)] sm:text-lg">
 						{pattern.description}
 					</p>
+					<PhaseRail pattern={pattern} activeIndex={previewMoment.index} />
+					<button className="preview-toggle" onClick={() => setPreviewPaused(value => !value)} aria-pressed={previewPaused}>
+						{previewPaused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
+						{previewPaused ? 'Play preview' : 'Pause preview'}
+					</button>
 					<div className="mt-3 min-h-16 w-full max-w-[30rem]">
 						{pattern.caution ? (
 							<p className="rounded-md bg-[color-mix(in_srgb,var(--background)_70%,transparent)] p-3 text-sm leading-5 text-[var(--foreground)] shadow-sm">
@@ -291,20 +317,27 @@ function HomeScreen({
 				</motion.div>
 			</div>
 
-			<div className="fixed bottom-[6.15rem] left-1/2 z-20 flex -translate-x-1/2 justify-center gap-2">
+			<div className="pattern-picker" aria-label="Breathing patterns">
 				{patterns.map((item, index) => (
 					<button
 						key={item.slug}
-						className={`h-2.5 rounded-full transition-all ${index === patternIndex ? 'w-7 bg-[var(--foreground)]' : 'w-2.5 bg-[color-mix(in_srgb,var(--foreground)_28%,transparent)]'}`}
+						className={`pattern-choice ${index === patternIndex ? 'pattern-choice-active' : ''}`}
+						style={getPatternVars(item)}
 						onClick={() => onSelectPattern(index)}
 						aria-label={`Select ${item.name}`}
-					/>
+						aria-pressed={index === patternIndex}
+						title={item.name}
+						onMouseEnter={() => setAnimatedIcon(item.slug)}
+						onMouseLeave={() => setAnimatedIcon(null)}
+						onFocus={() => setAnimatedIcon(item.slug)}
+						onBlur={() => setAnimatedIcon(null)}
+					><BreathVisual pattern={item} miniature={animatedIcon !== item.slug} /></button>
 				))}
 			</div>
 
-			<div className="fixed bottom-5 left-1/2 z-20 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2">
-				<button className="primary-button" onClick={onStart}>
-					Start
+			<div className="breath-start-control fixed bottom-5 left-1/2 z-20 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2">
+				<button className="primary-button" onClick={beginSession} disabled={starting}>
+					{starting ? 'Starting' : 'Start'}
 				</button>
 			</div>
 
@@ -465,162 +498,6 @@ function ToggleRow({
 	);
 }
 
-function SessionScreen({
-	pattern,
-	preference,
-	onFinish,
-}: {
-	pattern: BreathPattern;
-	preference: LocalPreference;
-	onFinish: (durationSec: number, completed: boolean) => void;
-}) {
-	const startedAtRef = useRef(Date.now());
-	const [phaseIndex, setPhaseIndex] = useState(0);
-	const [phaseElapsed, setPhaseElapsed] = useState(0);
-	const [roundIndex, setRoundIndex] = useState(0);
-	const phaseCount = pattern.phases.length;
-	const safePhaseIndex = phaseCount > 0 ? phaseIndex % phaseCount : 0;
-	const phase = pattern.phases[safePhaseIndex] ?? pattern.phases[0];
-	const elapsedTotal = Math.max(0, (Date.now() - startedAtRef.current) / 1000);
-	const sessionPlan = getSessionPlan(pattern, preference);
-	const phaseSeconds = phase.seconds ?? sessionPlan.variableHoldSec;
-	const phaseRemaining = Math.max(0, Math.ceil(phaseSeconds - phaseElapsed));
-	const totalRemaining = Math.max(0, Math.ceil(sessionPlan.targetSec - elapsedTotal));
-	const progress = Math.min(100, (elapsedTotal / sessionPlan.targetSec) * 100);
-	const statusText =
-		pattern.slug === 'wimhof'
-			? `Round ${Math.min(roundIndex + 1, sessionPlan.rounds)} of ${sessionPlan.rounds} · ${formatDuration(totalRemaining)} left`
-			: `${formatDuration(totalRemaining)} left`;
-
-	const playTone = useCallback((type: string) => {
-		const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-		const context = new AudioContextClass();
-		const oscillator = context.createOscillator();
-		const gain = context.createGain();
-		const frequency = type === 'inhale' ? 440 : type === 'exhale' ? 300 : 360;
-
-		oscillator.type = 'sine';
-		oscillator.frequency.value = frequency;
-		gain.gain.setValueAtTime(0, context.currentTime);
-		gain.gain.linearRampToValueAtTime(0.045, context.currentTime + 0.025);
-		gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.22);
-		oscillator.connect(gain);
-		gain.connect(context.destination);
-		oscillator.start();
-		oscillator.stop(context.currentTime + 0.24);
-	}, []);
-
-	useEffect(() => {
-		setPhaseElapsed(0);
-		if (preference.soundEnabled) playTone(phase.type);
-		if (preference.hapticsEnabled && 'vibrate' in navigator)
-			navigator.vibrate(40);
-	}, [
-		safePhaseIndex,
-		phase.type,
-		playTone,
-		preference.hapticsEnabled,
-		preference.soundEnabled,
-	]);
-
-	useEffect(() => {
-		const interval = window.setInterval(() => {
-			setPhaseElapsed(elapsed => {
-				const nextElapsed = elapsed + 0.1;
-				const nextTotalElapsed = (Date.now() - startedAtRef.current) / 1000;
-
-				if (nextTotalElapsed >= sessionPlan.targetSec) {
-					window.clearInterval(interval);
-					onFinish(Math.round(nextTotalElapsed), true);
-					return 0;
-				}
-
-				if (nextElapsed >= phaseSeconds) {
-					const isLastPhase = safePhaseIndex >= phaseCount - 1;
-					const isLastRound =
-						pattern.slug !== 'wimhof' || roundIndex >= sessionPlan.rounds - 1;
-
-					if (pattern.slug === 'wimhof' && isLastPhase && isLastRound) {
-						window.clearInterval(interval);
-						onFinish(
-							Math.round((Date.now() - startedAtRef.current) / 1000),
-							true,
-						);
-					} else if (isLastPhase) {
-						setPhaseIndex(0);
-						if (pattern.slug === 'wimhof') {
-							setRoundIndex(index => index + 1);
-						}
-					} else {
-						setPhaseIndex(safePhaseIndex + 1);
-					}
-					return 0;
-				}
-				return nextElapsed;
-			});
-		}, 100);
-
-		return () => window.clearInterval(interval);
-	}, [
-		onFinish,
-		phaseCount,
-		pattern.slug,
-		phaseSeconds,
-		roundIndex,
-		safePhaseIndex,
-		sessionPlan.rounds,
-		sessionPlan.targetSec,
-	]);
-
-	const finishNow = () =>
-		onFinish(
-			Math.round((Date.now() - startedAtRef.current) / 1000),
-			elapsedTotal > 0,
-		);
-
-	return (
-		<motion.section
-			className="relative flex min-h-screen items-center justify-center overflow-hidden px-6"
-			style={getPatternVars(pattern)}
-			initial={{ opacity: 0 }}
-			animate={{ opacity: 1 }}
-			exit={{ opacity: 0 }}
-		>
-			<button
-				className="absolute right-5 top-5 z-10 grid h-11 w-11 place-items-center text-[var(--foreground)]"
-				onClick={finishNow}
-				aria-label="End session"
-				title="End"
-			>
-				<X size={24} />
-			</button>
-
-			<div className="text-center">
-				<motion.div
-					className="mx-auto grid h-56 w-56 place-items-center rounded-full bg-[var(--pattern-bg)] sm:h-72 sm:w-72"
-					animate={{ scale: circleScale[phase.type] }}
-					transition={{ duration: phase.seconds ?? 8, ease: 'easeInOut' }}
-				>
-					<div className="grid h-36 w-36 place-items-center rounded-full bg-[var(--pattern-accent)] text-center text-xl font-semibold text-white shadow-lg sm:h-44 sm:w-44">
-						{phase.label}
-					</div>
-				</motion.div>
-				<p className="mt-8 text-lg text-[var(--foreground)]">{statusText}</p>
-				<p className="mt-2 text-sm text-[var(--muted)]">
-					{phase.label} · {phaseRemaining}s
-				</p>
-			</div>
-
-			<div className="absolute bottom-0 left-0 h-1 w-full bg-[var(--border)]">
-				<motion.div
-					className="h-full bg-[var(--pattern-accent)]"
-					style={{ width: `${progress}%` }}
-				/>
-			</div>
-		</motion.section>
-	);
-}
-
 function EndScreen({
 	session,
 	pattern,
@@ -632,23 +509,44 @@ function EndScreen({
 	onMood: (mood: number) => void;
 	onHome: () => void;
 }) {
+	const panel = useRef<HTMLDivElement>(null);
+	const [leaving, setLeaving] = useState(false);
+	const exitMotion = useRef<gsap.core.Timeline | null>(null);
+	useLayoutEffect(() => {
+		const context = gsap.context(() => {
+			const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			gsap.timeline({ onComplete: () => panel.current?.querySelector<HTMLHeadingElement>('h1')?.focus({ preventScroll: true }) })
+				.fromTo('.end-symbol', { scale: reduced ? 1 : 0.88, opacity: 0 }, { scale: 1, opacity: 1, duration: reduced ? 0.15 : 0.4, ease: 'power3.out' })
+				.fromTo('.end-detail', { y: reduced ? 0 : 7, opacity: 0 }, { y: 0, opacity: 1, duration: 0.24, stagger: reduced ? 0 : 0.05, ease: 'power2.out' }, 0.08);
+		}, panel);
+		return () => { exitMotion.current?.kill(); context.revert(); };
+	}, []);
+	const closeSummary = () => {
+		if (leaving || !panel.current) return;
+		setLeaving(true);
+		const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		exitMotion.current = gsap.timeline({ onComplete: onHome })
+			.to(panel.current, { opacity: 0, scale: reduced ? 1 : 0.98, duration: reduced ? 0.12 : 0.22, ease: 'power2.inOut' });
+	};
 	return (
 		<motion.section
-			className="flex min-h-screen items-center justify-center px-6"
-			initial={{ opacity: 0, y: 12 }}
-			animate={{ opacity: 1, y: 0 }}
-			exit={{ opacity: 0, y: -12 }}
+			className="flex min-h-screen items-center justify-center bg-[var(--pattern-bg)] px-6"
+			style={getPatternVars(pattern)}
+			initial={{ opacity: 0 }}
+			animate={{ opacity: 1 }}
+			exit={{ opacity: 0 }}
 		>
-			<div className="w-full max-w-sm text-center">
-				<div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-[var(--surface)]">
-					<Check size={30} />
+			<div ref={panel} inert={leaving} className="w-full max-w-sm text-center">
+				<div className="end-symbol mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-[var(--surface)]">
+					{session.completed ? <Check size={30} aria-hidden="true" /> : <Waves size={30} aria-hidden="true" />}
 				</div>
-				<h1 className="text-3xl font-semibold">
-					{formatDuration(session.durationSec)}
+				<h1 tabIndex={-1} className="end-detail text-3xl font-semibold">
+					{session.completed ? 'Session complete' : 'Session ended'}
 				</h1>
-				<p className="mt-2 text-[var(--muted)]">{pattern.name}</p>
+				<p className="end-detail mt-3 text-xl tabular-nums">{formatDuration(session.durationSec)}</p>
+				<p className="end-detail mt-2 text-[var(--muted)]">{pattern.name}</p>
 
-				<div className="my-9">
+				<div className="end-detail my-9">
 					<p className="mb-3 text-sm text-[var(--muted)]">
 						How do you feel now?
 					</p>
@@ -665,7 +563,7 @@ function EndScreen({
 					</div>
 				</div>
 
-				<button className="primary-button" onClick={onHome}>
+				<button className="end-detail primary-button" onClick={closeSummary} disabled={leaving}>
 					Home
 				</button>
 			</div>
@@ -764,29 +662,6 @@ function getPatternVars(pattern: BreathPattern) {
 		'--pattern-bg': `var(--pattern-${pattern.slug}-bg)`,
 		'--pattern-accent': `var(--pattern-${pattern.slug}-accent)`,
 	} as React.CSSProperties;
-}
-
-function getSessionPlan(pattern: BreathPattern, preference: LocalPreference) {
-	const variableHoldSec = 30;
-
-	if (pattern.slug === 'wimhof') {
-		const roundDuration = pattern.phases.reduce(
-			(total, phase) => total + (phase.seconds ?? variableHoldSec),
-			0,
-		);
-
-		return {
-			rounds: preference.wimHofRounds,
-			targetSec: roundDuration * preference.wimHofRounds,
-			variableHoldSec,
-		};
-	}
-
-	return {
-		rounds: 1,
-		targetSec: preference.sessionDurationMin * 60,
-		variableHoldSec,
-	};
 }
 
 function applyTheme(theme: LocalPreference['theme']) {

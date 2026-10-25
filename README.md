@@ -64,12 +64,23 @@ Standard patterns loop continuously until the selected target session duration i
 
 ---
 
+## Breathing visuals
+
+Each rhythm has its own GSAP animation and matching selector icon: tidal rings for coherent breathing, a four-sided trace for box breathing, a crescent for 4-7-8, rising arches with a top-up lift for the physiological sigh, expanding rays for Wim Hof style, and gently opening petals for Buteyko style.
+
+The animation timeline also supplies the session clock, so phase labels and countdowns follow the drawing. Pause stops both; changing tabs suspends playback. Reduced-motion preferences keep the artwork still while preserving the phase and countdown. Preview icons animate on pointer hover or keyboard focus.
+
+GSAP also handles the session lifecycle: the preview hands off to a short settling entrance, pause softens the artwork, resume restores the same breath position, and ending settles the drawing before the summary appears. A completed session gets a gentle finishing pulse. Early exits remain saved as incomplete sessions. Transition time does not advance the breathing clock, and a failed local save offers a visible retry path.
+
+Run `npm test` for timing-boundary checks across all six patterns, and `npm run build` for the production build.
+
 ## Tech Stack
 
 - Next.js 16 canary
 - React 19
 - Tailwind CSS
 - Framer Motion
+- GSAP
 - Prisma
 - Supabase Postgres
 - IndexedDB via `idb`
